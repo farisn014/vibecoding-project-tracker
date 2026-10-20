@@ -29,6 +29,60 @@ A single-page web app with two persistent surfaces:
 
 Each task carries the prompt context that produced it, so any teammate can click a button and copy the task + prompt history back into an AI chat to continue work.
 
+Functional Requirements- 
+
+FR1 - The system should show a Kanban board with four columns which are To Do, In progress, Review and Done 
+
+FR2 - The system should allow users to create, edit and delete tasks if necessary.
+
+FR3 - The system should allow users to click on an existing task to view and update the information, which could include the title, description, assignee and due date.
+
+FR4 - The system should enable users to change the task state and assign tasks to any people working with you.
+
+FR5 - The system should allow users to save prompt context for each task and copy it with the task details, for use in AI tools.
+
+FR6 - The system should allow users to create new tasks by entering the required task information.
+
+FR7 - The system should automatically save task and deliverable information so that it can be retrieved when the application is reopened.
+
+FR8 - The system shall allow users to change a task's status and move it between the four Kanban columns.
+
+
+Non-functional Requirements 
+
+NFR1 - The interface should be clear and easy for other members to navigate without complications.
+
+NFR2 - The app should respond quickly to any user interactions and display the Kanban board without any delays for expected dataset.
+
+NFR3 -The application should handle invalid inputs without crashing or saving invalid task data.
+
+NFR4 - Task information should remain available after refreshing the application, giving browser local storage has not been cleared 
+
+NFR5 - The application should operate in modern desktop web browsers that support its required technologies.
+
+NFR6 - The changes to a task shall be reflected in the appropriate Kanban column and remain consistent with the saved data.
+
+NFR8 - The interface should use sufficiently clear text, labels and visual distinctions to separate users identify task types and statuses.
+
+
+Data Requirements:
+
+DR1 - Each task should have  a unique ID, title and description.
+
+DR2 - Each task should store a type and a valid status
+
+DR3 - Each task should store an assignee, creation date and due date.
+
+DR4- Each task should store its prompt context, linked AI tool and update the timestamp.
+
+DR5 - The system should store task data in the browselocalStorage so the information can be retrieved between sessions.
+
+DR6 - The system should store the type of each task as either feature or bug.
+
+DR7 - When a task is edited, the system should update the existing stored record rather than create a duplicate task.
+
+DR8 - The system should store the URLs associated with the Presentation, Demo, Report and Documentation deliverables, allowing them to remain empty until available.
+
 ## 4. Primary user flow
 
 1. Open the Webapp. The board loads from local storage.
