@@ -33,6 +33,27 @@ const TASK_TYPES = {
   },
 };
 
+const AI_TOOLS = [
+  'Claude',
+  'ChatGPT',
+  'Cursor',
+  'Lovable',
+  'Replit',
+  'Other',
+];
+
+const CONTEXT_TEMPLATE = `Background:
+What are you trying to build or fix?
+
+Constraints:
+What requirements or limitations matter?
+
+Tried so far:
+What have you already attempted? What happened?
+
+Pick up:
+What should you ask the AI tool to do next?`;
+
 const INITIAL_TASKS = [
   {
     id: 'task-001',
@@ -100,6 +121,11 @@ function loadTasks() {
       status: STAGES.some((stage) => stage.id === task.status)
         ? task.status
         : 'todo',
+      context: typeof task.context === 'string' ? task.context : '',
+      contextTool: AI_TOOLS.includes(task.contextTool)
+        ? task.contextTool
+        : '',
+      contextUpdatedAt: task.contextUpdatedAt || null,
     }));
   } catch {
     return INITIAL_TASKS;
@@ -151,17 +177,8 @@ function TaskTypeBadge({ type }) {
   );
 }
 
-/*
- * MILESTONE 8: Due-date colour coding.
- *
- * This uses the existing dueDate and status fields.
- * No new task fields or changes to saved task data are needed.
- *
- * Deadline interpretation: the due date ends at 23:59:59.999
- * in the user's local time zone.
- */
+// MILESTONE 8: Calculate deadline styling using the existing task data.
 function getDueStyle(task, now = Date.now()) {
-  // Completed tasks must always look neutral, even when overdue.
   if (task.status === 'done') {
     return {
       className: 'bg-slate-100 border-slate-200',
@@ -170,7 +187,6 @@ function getDueStyle(task, now = Date.now()) {
     };
   }
 
-  // Tasks without a deadline retain a neutral appearance.
   if (!task.dueDate) {
     return {
       className: 'bg-white border-slate-200',
@@ -179,7 +195,6 @@ function getDueStyle(task, now = Date.now()) {
     };
   }
 
-  // Validate the existing YYYY-MM-DD date before using it.
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(task.dueDate);
 
   if (!match) {
@@ -204,7 +219,6 @@ function getDueStyle(task, now = Date.now()) {
     999,
   );
 
-  // Invalid calendar dates should not be shown as overdue.
   if (
     deadline.getFullYear() !== year ||
     deadline.getMonth() !== month - 1 ||
@@ -220,7 +234,6 @@ function getDueStyle(task, now = Date.now()) {
   const hoursRemaining =
     (deadline.getTime() - now) / (1000 * 60 * 60);
 
-  // The deadline has passed.
   if (hoursRemaining < 0) {
     return {
       className: 'bg-red-50 border-red-300',
@@ -229,7 +242,6 @@ function getDueStyle(task, now = Date.now()) {
     };
   }
 
-  // Less than 24 hours remain.
   if (hoursRemaining < 24) {
     return {
       className: 'bg-amber-50 border-amber-300',
@@ -238,7 +250,6 @@ function getDueStyle(task, now = Date.now()) {
     };
   }
 
-  // Between 24 and 48 hours remain.
   if (hoursRemaining <= 48) {
     return {
       className: 'bg-sky-50 border-sky-300',
@@ -247,7 +258,6 @@ function getDueStyle(task, now = Date.now()) {
     };
   }
 
-  // More than 48 hours remain.
   return {
     className: 'bg-emerald-50 border-emerald-200',
     label: '',
@@ -255,7 +265,57 @@ function getDueStyle(task, now = Date.now()) {
   };
 }
 
-function TaskModal({ task, onSave, onClose, onDelete }) {
+// MILESTONE 9: Format the context's last-updated time.
+function getRelativeTime(timestamp, now = Date.now()) {
+  if (!timestamp) {
+    return '';
+  }
+
+  const updatedTime = new Date(timestamp).getTime();
+
+  if (!Number.isFinite(updatedTime)) {
+    return '';
+  }
+
+  const elapsedSeconds = Math.max(
+    0,
+    Math.floor((now - updatedTime) / 1000),
+  );
+
+  if (elapsedSeconds < 60) {
+    return 'just now';
+  }
+
+  const minutes = Math.floor(elapsedSeconds / 60);
+
+  if (minutes < 60) {
+    return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+
+  if (hours < 24) {
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+
+  if (days < 30) {
+    return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+  }
+
+  const months = Math.floor(days / 30);
+
+  if (months < 12) {
+    return `${months} ${months === 1 ? 'month' : 'months'} ago`;
+  }
+
+  const years = Math.floor(days / 365);
+
+  return `${years} ${years === 1 ? 'year' : 'years'} ago`;
+}
+
+function TaskModal({ task, onSave, onClose, onDelete, now }) {
   const isEditing = Boolean(task);
 
   const [title, setTitle] = useState(task?.title || '');
@@ -268,6 +328,19 @@ function TaskModal({ task, onSave, onClose, onDelete }) {
     task?.assignee || TEAM[0],
   );
   const [dueDate, setDueDate] = useState(task?.dueDate || '');
+
+  // MILESTONE 9: Existing tasks keep their saved context.
+  // New tasks receive the starter template.
+  const [context, setContext] = useState(
+    task ? task.context || '' : CONTEXT_TEMPLATE,
+  );
+  const [contextTool, setContextTool] = useState(
+    task?.contextTool || '',
+  );
+  const [contextUpdatedAt, setContextUpdatedAt] = useState(
+    task?.contextUpdatedAt || null,
+  );
+
   const [error, setError] = useState('');
 
   function handleSubmit(event) {
@@ -287,6 +360,9 @@ function TaskModal({ task, onSave, onClose, onDelete }) {
       status,
       assignee,
       dueDate,
+      context,
+      contextTool,
+      contextUpdatedAt,
       createdDate:
         task?.createdDate || new Date().toISOString().slice(0, 10),
     });
@@ -368,6 +444,86 @@ function TaskModal({ task, onSave, onClose, onDelete }) {
               className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
             />
           </div>
+
+          {/* MILESTONE 9: Task context and AI tool selection */}
+          <section
+            aria-labelledby="task-context-heading"
+            className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4"
+          >
+            <div className="mb-3">
+              <h3
+                id="task-context-heading"
+                className="font-bold text-slate-900"
+              >
+                AI task context
+              </h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Save the background and progress needed to continue
+                working on this task with an AI coding tool.
+              </p>
+            </div>
+
+            <div>
+              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                <label
+                  htmlFor="task-context"
+                  className="text-sm font-semibold text-slate-700"
+                >
+                  Context (Markdown)
+                </label>
+
+                {contextUpdatedAt && (
+                  <span
+                    className="text-xs text-slate-500"
+                    aria-live="polite"
+                  >
+                    Last updated{' '}
+                    {getRelativeTime(contextUpdatedAt, now)}
+                  </span>
+                )}
+              </div>
+
+              <textarea
+                id="task-context"
+                value={context}
+                onChange={(event) => {
+                  setContext(event.target.value);
+                  setContextUpdatedAt(new Date().toISOString());
+                }}
+                placeholder={CONTEXT_TEMPLATE}
+                rows={8}
+                className="w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 font-mono text-sm leading-6 text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              />
+
+              <p className="mt-1.5 text-xs text-slate-500">
+                Include relevant prompts, decisions, errors, constraints
+                and what the next person or AI tool should do.
+              </p>
+            </div>
+
+            <div className="mt-4">
+              <label
+                htmlFor="task-context-tool"
+                className="mb-1.5 block text-sm font-semibold text-slate-700"
+              >
+                AI tool (optional)
+              </label>
+
+              <select
+                id="task-context-tool"
+                value={contextTool}
+                onChange={(event) => setContextTool(event.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              >
+                <option value="">Select an AI tool...</option>
+                {AI_TOOLS.map((tool) => (
+                  <option key={tool} value={tool}>
+                    {tool}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </section>
 
           <div>
             <p className="mb-2 block text-sm font-semibold text-slate-700">
@@ -586,8 +742,6 @@ function TeamOverview({ tasks }) {
 
 function TaskCard({ task, onOpen, onHandOff, now }) {
   const typeStyle = TASK_TYPES[task.type] || TASK_TYPES.feature;
-
-  // MILESTONE 8: Calculate deadline styling using the existing task data.
   const dueStyle = getDueStyle(task, now);
 
   return (
@@ -630,50 +784,50 @@ function TaskCard({ task, onOpen, onHandOff, now }) {
         </div>
 
         {task.dueDate && (
-  <div className="mt-4 flex flex-wrap items-center gap-2">
-    <div
-      className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 ${
-        task.status === 'done'
-          ? 'border-slate-300 bg-slate-100 text-slate-600'
-          : dueStyle.label === 'Overdue'
-            ? 'border-red-300 bg-red-100 text-red-900'
-            : dueStyle.label === 'Due soon'
-              ? 'border-amber-300 bg-amber-100 text-amber-900'
-              : dueStyle.label === 'Due shortly'
-                ? 'border-sky-300 bg-sky-100 text-sky-900'
-                : 'border-emerald-300 bg-emerald-100 text-emerald-900'
-      }`}
-    >
-      <span aria-hidden="true" className="text-base">
-        📅
-      </span>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div
+              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 ${
+                task.status === 'done'
+                  ? 'border-slate-300 bg-slate-100 text-slate-600'
+                  : dueStyle.label === 'Overdue'
+                    ? 'border-red-300 bg-red-100 text-red-900'
+                    : dueStyle.label === 'Due soon'
+                      ? 'border-amber-300 bg-amber-100 text-amber-900'
+                      : dueStyle.label === 'Due shortly'
+                        ? 'border-sky-300 bg-sky-100 text-sky-900'
+                        : 'border-emerald-300 bg-emerald-100 text-emerald-900'
+              }`}
+            >
+              <span aria-hidden="true" className="text-base">
+                📅
+              </span>
 
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-wider opacity-75">
-          Due date
-        </p>
-        <p className="text-sm font-bold">
-          {new Date(`${task.dueDate}T00:00:00`).toLocaleDateString(
-            'en-GB',
-            {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            },
-          )}
-        </p>
-      </div>
-    </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider opacity-75">
+                  Due date
+                </p>
+                <p className="text-sm font-bold">
+                  {new Date(`${task.dueDate}T00:00:00`).toLocaleDateString(
+                    'en-GB',
+                    {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    },
+                  )}
+                </p>
+              </div>
+            </div>
 
-    {dueStyle.label && (
-      <span
-        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${dueStyle.labelClassName}`}
-      >
-        {dueStyle.label}
-      </span>
-    )}
-  </div>
-)}
+            {dueStyle.label && (
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${dueStyle.labelClassName}`}
+              >
+                {dueStyle.label}
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="mt-3">
           <label
@@ -749,8 +903,7 @@ export default function App() {
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [handoffMessage, setHandoffMessage] = useState('');
 
-  // MILESTONE 8: Keep the current time in state so deadline colours
-  // refresh automatically, without the user needing to refresh the page.
+  // MILESTONE 8: Update deadline colours and context timestamps automatically.
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -979,6 +1132,7 @@ export default function App() {
         <TaskModal
           key={selectedTask?.id || 'new-task'}
           task={selectedTask}
+          now={now}
           onSave={saveTask}
           onClose={() => {
             setSelectedTask(null);
