@@ -1,18 +1,6 @@
 
 import { useState, useEffect } from 'react';
 
-/**
- * @typedef {Object} Task
- * @property {string} id
- * @property {string} title
- * @property {string} description
- * @property {'feature'|'bug'} type
- * @property {'todo'|'in-progress'|'review'|'done'} status
- * @property {string} assignee
- * @property {string|null} dueDate
- * @property {string} createdDate
- */
-
 export const STAGES = [
   { id: 'todo', label: 'To Do' },
   { id: 'in-progress', label: 'In Progress' },
@@ -20,29 +8,11 @@ export const STAGES = [
   { id: 'done', label: 'Done' },
 ];
 
-// Replace these names with the names in PRD §8 when available.
-export const TEAM = ['Teammate A', 'Teammate B', 'Teammate C'];
-
-export function useLocalStorage(key, initialValue) {
-  const [value, setValue] = useState(() => {
-    try {
-      const raw = window.localStorage.getItem(key);
-      return raw != null ? JSON.parse(raw) : initialValue;
-    } catch {
-      return initialValue;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      // Ignore storage errors for now.
-    }
-  }, [key, value]);
-
-  return [value, setValue];
-}
+export const TEAM = [
+  'Teammate A',
+  'Teammate B',
+  'Teammate C',
+];
 
 const INITIAL_TASKS = [
   {
@@ -62,7 +32,7 @@ const INITIAL_TASKS = [
     type: 'bug',
     status: 'todo',
     assignee: TEAM[1],
-    dueDate: null,
+    dueDate: '',
     createdDate: '2026-10-26',
   },
   {
@@ -82,26 +52,320 @@ const INITIAL_TASKS = [
     type: 'feature',
     status: 'done',
     assignee: TEAM[0],
-    dueDate: null,
+    dueDate: '',
     createdDate: '2026-10-26',
   },
 ];
 
+function loadTasks() {
+  try {
+    const saved = window.localStorage.getItem('vibetracker.tasks');
+    return saved ? JSON.parse(saved) : INITIAL_TASKS;
+  } catch {
+    return INITIAL_TASKS;
+  }
+}
+
+function TaskModal({ task, onSave, onDelete, onClose }) {
+  const [form, setForm] = useState(() => ({
+    title: task?.title ?? '',
+    description: task?.description ?? '',
+    type: task?.type ?? 'feature',
+    status: task?.status ?? 'todo',
+    assignee: task?.assignee ?? TEAM[0],
+    dueDate: task?.dueDate ?? '',
+  }));
+
+  const [error, setError] = useState('');
+
+  function updateField(event) {
+    const { name, value } = event.target;
+    setForm((previous) => ({ ...previous, [name]: value }));
+  }
+
+  function submitForm(event) {
+    event.preventDefault();
+
+    if (!form.title.trim()) {
+      setError('Please enter a task title.');
+      return;
+    }
+
+    onSave({
+      ...task,
+      ...form,
+      title: form.title.trim(),
+      description: form.description.trim(),
+      dueDate: form.dueDate || null,
+    });
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="task-modal-title"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+      >
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <h2 id="task-modal-title" className="text-xl font-bold">
+            {task ? 'Edit task' : 'Create task'}
+          </h2>
+
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close modal"
+            className="rounded-lg px-3 py-1 text-xl text-slate-500 hover:bg-slate-100"
+          >
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={submitForm} className="space-y-4">
+          <div>
+            <label htmlFor="title" className="mb-1 block text-sm font-medium">
+              Title *
+            </label>
+            <input
+              id="title"
+              name="title"
+              value={form.title}
+              onChange={updateField}
+              required
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-700"
+              placeholder="Enter task title"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="description"
+              className="mb-1 block text-sm font-medium"
+            >
+              Description
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              value={form.description}
+              onChange={updateField}
+              rows={3}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-700"
+              placeholder="Describe the task"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="type" className="mb-1 block text-sm font-medium">
+                Type
+              </label>
+              <select
+                id="type"
+                name="type"
+                value={form.type}
+                onChange={updateField}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2"
+              >
+                <option value="feature">Feature</option>
+                <option value="bug">Bug</option>
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="status"
+                className="mb-1 block text-sm font-medium"
+              >
+                Status
+              </label>
+              <select
+                id="status"
+                name="status"
+                value={form.status}
+                onChange={updateField}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2"
+              >
+                {STAGES.map((stage) => (
+                  <option key={stage.id} value={stage.id}>
+                    {stage.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="assignee"
+              className="mb-1 block text-sm font-medium"
+            >
+              Assignee
+            </label>
+            <select
+              id="assignee"
+              name="assignee"
+              value={form.assignee}
+              onChange={updateField}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            >
+              {TEAM.map((member) => (
+                <option key={member} value={member}>
+                  {member}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="dueDate"
+              className="mb-1 block text-sm font-medium"
+            >
+              Due date
+            </label>
+            <input
+              id="dueDate"
+              name="dueDate"
+              type="date"
+              value={form.dueDate ?? ''}
+              onChange={updateField}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            />
+          </div>
+
+          {error && (
+            <p role="alert" className="text-sm text-red-600">
+              {error}
+            </p>
+          )}
+
+          <div className="flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-4">
+            <div>
+              {task && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(task.id)}
+                  className="rounded-lg px-4 py-2 font-medium text-red-700 hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-slate-300 px-4 py-2 font-medium hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                className="rounded-lg bg-brand-primary px-4 py-2 font-semibold text-white hover:bg-teal-800"
+              >
+                Save task
+              </button>
+            </div>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 export default function App() {
-  const [tasks] = useLocalStorage('vibetracker.tasks', INITIAL_TASKS);
+  const [tasks, setTasks] = useState(loadTasks);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        'vibetracker.tasks',
+        JSON.stringify(tasks)
+      );
+    } catch {
+      // Storage may be unavailable in some browser environments.
+    }
+  }, [tasks]);
+
+  function saveTask(formData) {
+    if (selectedTask) {
+      setTasks((previous) =>
+        previous.map((task) =>
+          task.id === selectedTask.id
+            ? { ...task, ...formData }
+            : task
+        )
+      );
+    } else {
+      const newTask = {
+        ...formData,
+        id: `task-${Date.now()}`,
+        createdDate: new Date().toISOString().slice(0, 10),
+      };
+
+      setTasks((previous) => [...previous, newTask]);
+    }
+
+    setSelectedTask(null);
+    setIsCreating(false);
+  }
+
+  function deleteTask(taskId) {
+    setPendingDeleteId(taskId);
+  }
+
+  function confirmDelete() {
+    if (!pendingDeleteId) return;
+
+    setTasks((previous) =>
+      previous.filter((task) => task.id !== pendingDeleteId)
+    );
+
+    setSelectedTask(null);
+    setIsCreating(false);
+    setPendingDeleteId(null);
+  }
 
   return (
     <div className="min-h-screen bg-surface-page p-6 text-text-primary">
-      <header className="mb-8">
-        <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-brand-primary">
-          Team workspace
-        </p>
-        <h1 className="text-2xl font-bold">
-          Vibecoding Project Tracker
-        </h1>
-        <p className="mt-2 text-sm text-text-muted">
-          Keep your tasks, deadlines and coding context organised.
-        </p>
+      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-brand-primary">
+            Team workspace
+          </p>
+
+          <h1 className="text-2xl font-bold">
+            Vibecoding Project Tracker
+          </h1>
+
+          <p className="mt-2 text-sm text-text-muted">
+            Keep your tasks, deadlines and coding context organised.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedTask(null);
+            setIsCreating(true);
+          }}
+          className="rounded-lg bg-brand-primary px-4 py-2.5 font-semibold text-white shadow-sm hover:bg-teal-800"
+        >
+          + Add Task
+        </button>
       </header>
 
       <main className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
@@ -117,6 +381,7 @@ export default function App() {
             >
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="font-semibold">{stage.label}</h2>
+
                 <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-text-muted">
                   {stageTasks.length}
                 </span>
@@ -124,9 +389,14 @@ export default function App() {
 
               <div className="space-y-3">
                 {stageTasks.map((task) => (
-                  <article
+                  <button
+                    type="button"
                     key={task.id}
-                    className="rounded-lg border border-slate-200 bg-surface-card p-4 shadow-sm"
+                    onClick={() => {
+                      setSelectedTask(task);
+                      setIsCreating(false);
+                    }}
+                    className="block w-full rounded-lg border border-slate-200 bg-surface-card p-4 text-left shadow-sm transition hover:border-teal-500 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-teal-600"
                   >
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <span
@@ -154,6 +424,7 @@ export default function App() {
                       <p className="text-xs text-text-muted">
                         Assigned to
                       </p>
+
                       <p className="mt-1 text-sm font-medium">
                         {task.assignee}
                       </p>
@@ -164,7 +435,11 @@ export default function App() {
                         </p>
                       )}
                     </div>
-                  </article>
+
+                    <p className="mt-3 text-xs text-brand-primary">
+                      Click to view or edit
+                    </p>
+                  </button>
                 ))}
 
                 {stageTasks.length === 0 && (
@@ -177,6 +452,68 @@ export default function App() {
           );
         })}
       </main>
+
+      {(isCreating || selectedTask) && (
+        <TaskModal
+          key={selectedTask?.id ?? 'new-task'}
+          task={selectedTask}
+          onSave={saveTask}
+          onDelete={deleteTask}
+          onClose={() => {
+            setSelectedTask(null);
+            setIsCreating(false);
+          }}
+        />
+      )}
+
+      {pendingDeleteId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4">
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-dialog-title"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100">
+                <span className="text-xl text-red-600">!</span>
+              </div>
+
+              <div>
+                <h2
+                  id="delete-dialog-title"
+                  className="text-lg font-bold text-slate-900"
+                >
+                  Delete task?
+                </h2>
+
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Are you sure you want to delete this task? This action
+                  cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPendingDeleteId(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700"
+              >
+                Delete task
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
