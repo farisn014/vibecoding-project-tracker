@@ -1,44 +1,149 @@
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-export const STAGES = [
-  { id: 'todo', label: 'To Do' },
-  { id: 'in-progress', label: 'In Progress' },
-  { id: 'review', label: 'Review' },
-  { id: 'done', label: 'Done' },
+const STORAGE_KEY = 'vibetracker.tasks';
+
+const STAGES = [
+  { id: 'todo', title: 'To Do' },
+  { id: 'in-progress', title: 'In Progress' },
+  { id: 'review', title: 'Review' },
+  { id: 'done', title: 'Done' },
 ];
 
-export const TEAM = [
-  'Teammate A',
-  'Teammate B',
-  'Teammate C',
+const TEAM = ['Teammate A', 'Teammate B', 'Teammate C'];
+
+const AVATAR_STYLES = [
+  'bg-teal-700 text-white',
+  'bg-violet-700 text-white',
+  'bg-amber-400 text-slate-950',
 ];
 
 const TASK_TYPES = {
   feature: {
     label: 'Feature',
     icon: '✦',
-    badge: 'bg-blue-100 text-blue-800 ring-1 ring-blue-200',
-    card: 'border-blue-200 border-l-blue-600 bg-blue-50/50 hover:border-blue-400',
-    preview: 'border-blue-200 bg-blue-50',
-    heading: 'text-blue-900',
+    badge: 'bg-blue-100 text-blue-800',
+    card: 'border-l-blue-500',
   },
   bug: {
     label: 'Bug',
     icon: '🐛',
-    badge: 'bg-red-100 text-red-800 ring-1 ring-red-200',
-    card: 'border-red-200 border-l-red-600 bg-red-50/50 hover:border-red-400',
-    preview: 'border-red-200 bg-red-50',
-    heading: 'text-red-900',
+    badge: 'bg-red-100 text-red-800',
+    card: 'border-l-red-500',
   },
 };
 
-function TaskTypeBadge({ type }) {
-  const style = TASK_TYPES[type] ?? TASK_TYPES.feature;
+const INITIAL_TASKS = [
+  {
+    id: 'task-001',
+    title: 'Set up project repository',
+    description:
+      'Create the repository and establish the initial project structure.',
+    type: 'feature',
+    status: 'done',
+    assignee: 'Teammate A',
+    dueDate: '',
+    createdDate: '2026-10-01',
+  },
+  {
+    id: 'task-002',
+    title: 'Build the Kanban board',
+    description: 'Display tasks in the four workflow columns.',
+    type: 'feature',
+    status: 'in-progress',
+    assignee: 'Teammate B',
+    dueDate: '',
+    createdDate: '2026-10-02',
+  },
+  {
+    id: 'task-003',
+    title: 'Fix task status updates',
+    description:
+      'Make sure a task retains its selected status when edited.',
+    type: 'bug',
+    status: 'review',
+    assignee: 'Teammate C',
+    dueDate: '',
+    createdDate: '2026-10-03',
+  },
+  {
+    id: 'task-004',
+    title: 'Improve task descriptions',
+    description:
+      'Make it easier for teammates to understand what each task involves.',
+    type: 'feature',
+    status: 'todo',
+    assignee: 'Teammate A',
+    dueDate: '',
+    createdDate: '2026-10-04',
+  },
+];
+
+function loadTasks() {
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+
+    if (!saved) {
+      return INITIAL_TASKS;
+    }
+
+    const parsed = JSON.parse(saved);
+
+    if (!Array.isArray(parsed)) {
+      return INITIAL_TASKS;
+    }
+
+    return parsed.map((task) => ({
+      ...task,
+      assignee: TEAM.includes(task.assignee) ? task.assignee : TEAM[0],
+      type: TASK_TYPES[task.type] ? task.type : 'feature',
+      status: STAGES.some((stage) => stage.id === task.status)
+        ? task.status
+        : 'todo',
+    }));
+  } catch {
+    return INITIAL_TASKS;
+  }
+}
+
+function getInitials(name) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function getAvatarStyle(name) {
+  const index = TEAM.indexOf(name);
+  const safeIndex = index >= 0 ? index : 0;
+
+  return AVATAR_STYLES[safeIndex % AVATAR_STYLES.length];
+}
+
+function TaskAvatar({ name, size = 'normal' }) {
+  const dimensions =
+    size === 'large' ? 'h-11 w-11 text-sm' : 'h-9 w-9 text-xs';
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold ${style.badge}`}
+      title={name}
+      aria-label={name}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full font-bold ring-2 ring-white ${dimensions} ${getAvatarStyle(name)}`}
+    >
+      {getInitials(name)}
+    </span>
+  );
+}
+
+function TaskTypeBadge({ type }) {
+  const style = TASK_TYPES[type] || TASK_TYPES.feature;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${style.badge}`}
     >
       <span aria-hidden="true">{style.icon}</span>
       {style.label}
@@ -46,200 +151,182 @@ function TaskTypeBadge({ type }) {
   );
 }
 
-const INITIAL_TASKS = [
-  {
-    id: 'task-001',
-    title: 'Create Kanban board',
-    description: 'Build the four-column task board.',
-    type: 'feature',
-    status: 'in-progress',
-    assignee: TEAM[0],
-    dueDate: '2026-11-02',
-    createdDate: '2026-10-26',
-  },
-  {
-    id: 'task-002',
-    title: 'Fix task deletion',
-    description: 'Make sure tasks can be removed safely.',
-    type: 'bug',
-    status: 'todo',
-    assignee: TEAM[1],
-    dueDate: '',
-    createdDate: '2026-10-26',
-  },
-  {
-    id: 'task-003',
-    title: 'Design task modal',
-    description: 'Plan the form for creating and editing tasks.',
-    type: 'feature',
-    status: 'review',
-    assignee: TEAM[2],
-    dueDate: '2026-11-05',
-    createdDate: '2026-10-26',
-  },
-  {
-    id: 'task-004',
-    title: 'Test local storage',
-    description: 'Check that task data survives a page refresh.',
-    type: 'feature',
-    status: 'done',
-    assignee: TEAM[0],
-    dueDate: '',
-    createdDate: '2026-10-26',
-  },
-];
+function TaskModal({ task, onSave, onClose, onDelete }) {
+  const isEditing = Boolean(task);
 
-function loadTasks() {
-  try {
-    const saved = window.localStorage.getItem('vibetracker.tasks');
-    return saved ? JSON.parse(saved) : INITIAL_TASKS;
-  } catch {
-    return INITIAL_TASKS;
-  }
-}
-
-function TaskModal({ task, onSave, onDelete, onClose }) {
-  const [form, setForm] = useState(() => ({
-    title: task?.title ?? '',
-    description: task?.description ?? '',
-    type: task?.type ?? 'feature',
-    status: task?.status ?? 'todo',
-    assignee: task?.assignee ?? TEAM[0],
-    dueDate: task?.dueDate ?? '',
-  }));
-
+  const [title, setTitle] = useState(task?.title || '');
+  const [description, setDescription] = useState(
+    task?.description || '',
+  );
+  const [type, setType] = useState(task?.type || 'feature');
+  const [status, setStatus] = useState(task?.status || 'todo');
+  const [assignee, setAssignee] = useState(
+    task?.assignee || TEAM[0],
+  );
+  const [dueDate, setDueDate] = useState(task?.dueDate || '');
   const [error, setError] = useState('');
-  const typeStyle = TASK_TYPES[form.type] ?? TASK_TYPES.feature;
 
-  function updateField(event) {
-    const { name, value } = event.target;
-    setForm((previous) => ({ ...previous, [name]: value }));
-  }
-
-  function submitForm(event) {
+  function handleSubmit(event) {
     event.preventDefault();
 
-    if (!form.title.trim()) {
+    if (!title.trim()) {
       setError('Please enter a task title.');
       return;
     }
 
     onSave({
-      ...task,
-      ...form,
-      title: form.title.trim(),
-      description: form.description.trim(),
-      dueDate: form.dueDate || null,
+      ...(task || {}),
+      id: task?.id || `task-${Date.now()}`,
+      title: title.trim(),
+      description: description.trim(),
+      type,
+      status,
+      assignee,
+      dueDate,
+      createdDate:
+        task?.createdDate || new Date().toISOString().slice(0, 10),
     });
   }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
       }}
     >
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="task-modal-title"
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
       >
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <h2 id="task-modal-title" className="text-xl font-bold">
-            {task ? 'Edit task' : 'Create task'}
-          </h2>
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h2
+              id="task-modal-title"
+              className="text-xl font-bold text-slate-900"
+            >
+              {isEditing ? 'Edit task' : 'Create a task'}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Add the details your team needs to get the work done.
+            </p>
+          </div>
 
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close modal"
-            className="rounded-lg px-3 py-1 text-xl text-slate-500 hover:bg-slate-100"
+            aria-label="Close task form"
+            className="rounded-lg px-3 py-1 text-2xl text-slate-500 hover:bg-slate-100 hover:text-slate-900"
           >
             ×
           </button>
         </div>
 
-        <form onSubmit={submitForm} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="title" className="mb-1 block text-sm font-medium">
-              Title *
+            <label
+              htmlFor="task-title"
+              className="mb-1.5 block text-sm font-semibold text-slate-700"
+            >
+              Task title *
             </label>
             <input
-              id="title"
-              name="title"
-              value={form.title}
-              onChange={updateField}
-              required
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-700"
-              placeholder="Enter task title"
+              id="task-title"
+              value={title}
+              onChange={(event) => {
+                setTitle(event.target.value);
+                setError('');
+              }}
+              placeholder="What needs to be done?"
+              maxLength={120}
+              autoFocus
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
             />
           </div>
 
           <div>
             <label
-              htmlFor="description"
-              className="mb-1 block text-sm font-medium"
+              htmlFor="task-description"
+              className="mb-1.5 block text-sm font-semibold text-slate-700"
             >
               Description
             </label>
             <textarea
-              id="description"
-              name="description"
-              value={form.description}
-              onChange={updateField}
+              id="task-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Add some context for your teammates..."
               rows={3}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-700"
-              placeholder="Describe the task"
+              className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
             />
           </div>
 
-          <div className={`rounded-lg border p-3 ${typeStyle.preview}`}>
-            <div className="flex flex-wrap items-center gap-2">
-              <TaskTypeBadge type={form.type} />
-              <span className={`text-sm font-medium ${typeStyle.heading}`}>
-                {form.type === 'bug'
-                  ? 'An issue that needs fixing'
-                  : 'New functionality or improvement'}
-              </span>
+          <div>
+            <p className="mb-2 block text-sm font-semibold text-slate-700">
+              Task type
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {Object.entries(TASK_TYPES).map(([typeId, typeInfo]) => (
+                <button
+                  key={typeId}
+                  type="button"
+                  onClick={() => setType(typeId)}
+                  aria-pressed={type === typeId}
+                  className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
+                    type === typeId
+                      ? `${typeInfo.badge} border-current ring-2 ring-indigo-100`
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span aria-hidden="true">{typeInfo.icon}</span>{' '}
+                  {typeInfo.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="type" className="mb-1 block text-sm font-medium">
-                Type
+              <label
+                htmlFor="task-status"
+                className="mb-1.5 block text-sm font-semibold text-slate-700"
+              >
+                Status
               </label>
               <select
-                id="type"
-                name="type"
-                value={form.type}
-                onChange={updateField}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                id="task-status"
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
               >
-                <option value="feature">Feature</option>
-                <option value="bug">Bug</option>
+                {STAGES.map((stage) => (
+                  <option key={stage.id} value={stage.id}>
+                    {stage.title}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div>
               <label
-                htmlFor="status"
-                className="mb-1 block text-sm font-medium"
+                htmlFor="task-assignee"
+                className="mb-1.5 block text-sm font-semibold text-slate-700"
               >
-                Status
+                Assigned to
               </label>
               <select
-                id="status"
-                name="status"
-                value={form.status}
-                onChange={updateField}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                id="task-assignee"
+                value={assignee}
+                onChange={(event) => setAssignee(event.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
               >
-                {STAGES.map((stage) => (
-                  <option key={stage.id} value={stage.id}>
-                    {stage.label}
+                {TEAM.map((member) => (
+                  <option key={member} value={member}>
+                    {member}
                   </option>
                 ))}
               </select>
@@ -248,76 +335,52 @@ function TaskModal({ task, onSave, onDelete, onClose }) {
 
           <div>
             <label
-              htmlFor="assignee"
-              className="mb-1 block text-sm font-medium"
-            >
-              Assignee
-            </label>
-            <select
-              id="assignee"
-              name="assignee"
-              value={form.assignee}
-              onChange={updateField}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            >
-              {TEAM.map((member) => (
-                <option key={member} value={member}>
-                  {member}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label
-              htmlFor="dueDate"
-              className="mb-1 block text-sm font-medium"
+              htmlFor="task-due-date"
+              className="mb-1.5 block text-sm font-semibold text-slate-700"
             >
               Due date
             </label>
             <input
-              id="dueDate"
-              name="dueDate"
+              id="task-due-date"
               type="date"
-              value={form.dueDate ?? ''}
-              onChange={updateField}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
             />
           </div>
 
           {error && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-sm font-medium text-red-600">
               {error}
             </p>
           )}
 
-          <div className="flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
             <div>
-              {task && (
+              {isEditing && (
                 <button
                   type="button"
                   onClick={() => onDelete(task.id)}
-                  className="rounded-lg px-4 py-2 font-medium text-red-700 hover:bg-red-50"
+                  className="rounded-xl px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
                 >
-                  Delete
+                  Delete task
                 </button>
               )}
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-slate-300 px-4 py-2 font-medium hover:bg-slate-50"
+                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Cancel
               </button>
-
               <button
                 type="submit"
-                className="rounded-lg bg-brand-primary px-4 py-2 font-semibold text-white hover:bg-teal-800"
+                className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
               >
-                Save task
+                {isEditing ? 'Save changes' : 'Create task'}
               </button>
             </div>
           </div>
@@ -327,236 +390,433 @@ function TaskModal({ task, onSave, onDelete, onClose }) {
   );
 }
 
+function DeleteConfirmation({ onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4">
+      <section
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="delete-dialog-title"
+        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+      >
+        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-red-100 text-xl text-red-700">
+          !
+        </div>
+
+        <h2
+          id="delete-dialog-title"
+          className="text-lg font-bold text-slate-900"
+        >
+          Delete this task?
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          This action cannot be undone. The task will be permanently removed
+          from your board.
+        </p>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
+          >
+            Delete task
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function TeamOverview({ tasks }) {
+  return (
+    <section
+      aria-labelledby="team-overview-title"
+      className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+    >
+      <div className="mb-4">
+        <h2 id="team-overview-title" className="font-bold text-slate-900">
+          Team overview
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          See who is responsible for the work currently in progress.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {TEAM.map((member) => {
+          const activeCount = tasks.filter(
+            (task) =>
+              task.assignee === member && task.status !== 'done',
+          ).length;
+
+          return (
+            <div
+              key={member}
+              className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3"
+            >
+              <TaskAvatar name={member} size="large" />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900">
+                  {member}
+                </p>
+                <p className="text-sm text-slate-500">
+                  {activeCount} active{' '}
+                  {activeCount === 1 ? 'task' : 'tasks'}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function TaskCard({ task, onOpen, onHandOff }) {
+  const typeStyle = TASK_TYPES[task.type] || TASK_TYPES.feature;
+
+  return (
+    <article
+      className={`rounded-xl border border-slate-200 border-l-4 ${typeStyle.card} bg-white p-4 shadow-sm transition hover:shadow-md`}
+    >
+      <button
+        type="button"
+        onClick={() => onOpen(task)}
+        className="block w-full rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        aria-label={`Edit task: ${task.title}`}
+      >
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <TaskTypeBadge type={task.type} />
+          <span className="text-xs text-slate-400">
+            {task.id.replace('task-', '#')}
+          </span>
+        </div>
+
+        <h3 className="break-words font-semibold text-slate-900">
+          {task.title}
+        </h3>
+
+        {task.description && (
+          <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words text-sm leading-5 text-slate-600">
+            {task.description}
+          </p>
+        )}
+      </button>
+
+      <div className="mt-4 border-t border-slate-100 pt-3">
+        <div className="flex items-center gap-2">
+          <TaskAvatar name={task.assignee} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-slate-800">
+              {task.assignee}
+            </p>
+            <p className="text-xs text-slate-500">Task owner</p>
+          </div>
+        </div>
+
+        {task.dueDate && (
+          <p className="mt-3 text-xs text-slate-500">
+            <span aria-hidden="true">📅 </span>
+            Due{' '}
+            {new Date(`${task.dueDate}T00:00:00`).toLocaleDateString(
+              'en-GB',
+              {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              },
+            )}
+          </p>
+        )}
+
+        <div className="mt-3">
+          <label
+            htmlFor={`handoff-${task.id}`}
+            className="mb-1.5 block text-xs font-semibold text-slate-600"
+          >
+            Hand off to…
+          </label>
+          <select
+            id={`handoff-${task.id}`}
+            value={task.assignee}
+            onChange={(event) => onHandOff(task, event.target.value)}
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          >
+            {TEAM.map((member) => (
+              <option key={member} value={member}>
+                {member}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onOpen(task)}
+          className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+        >
+          View or edit task
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function HandoffToast({ message, onDismiss }) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <div
+      role="status"
+      className="fixed bottom-5 right-5 z-[70] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white p-4 shadow-xl"
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
+        ✓
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-slate-900">Task reassigned</p>
+        <p className="mt-1 break-words text-sm text-slate-600">
+          {message}
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss notification"
+        className="rounded-lg px-2 text-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const [tasks, setTasks] = useState(loadTasks);
   const [selectedTask, setSelectedTask] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [handoffMessage, setHandoffMessage] = useState('');
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(
-        'vibetracker.tasks',
-        JSON.stringify(tasks)
-      );
-    } catch {
-      // Storage may be unavailable in some browser environments.
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    } catch (error) {
+      console.error('Unable to save tasks to local storage:', error);
     }
   }, [tasks]);
 
-  function saveTask(formData) {
-    if (selectedTask) {
-      setTasks((previous) =>
-        previous.map((task) =>
-          task.id === selectedTask.id
-            ? { ...task, ...formData }
-            : task
-        )
-      );
-    } else {
-      const newTask = {
-        ...formData,
-        id: `task-${Date.now()}`,
-        createdDate: new Date().toISOString().slice(0, 10),
-      };
-
-      setTasks((previous) => [...previous, newTask]);
+  useEffect(() => {
+    if (!handoffMessage) {
+      return undefined;
     }
+
+    const timeoutId = window.setTimeout(() => {
+      setHandoffMessage('');
+    }, 4000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [handoffMessage]);
+
+  function saveTask(taskToSave) {
+    setTasks((currentTasks) => {
+      const existing = currentTasks.some(
+        (task) => task.id === taskToSave.id,
+      );
+
+      if (existing) {
+        return currentTasks.map((task) =>
+          task.id === taskToSave.id ? taskToSave : task,
+        );
+      }
+
+      return [...currentTasks, taskToSave];
+    });
 
     setSelectedTask(null);
     setIsCreating(false);
   }
 
   function deleteTask(taskId) {
+    setSelectedTask(null);
+    setIsCreating(false);
     setPendingDeleteId(taskId);
   }
 
   function confirmDelete() {
-    if (!pendingDeleteId) return;
-
-    setTasks((previous) =>
-      previous.filter((task) => task.id !== pendingDeleteId)
+    setTasks((currentTasks) =>
+      currentTasks.filter((task) => task.id !== pendingDeleteId),
     );
-
-    setSelectedTask(null);
-    setIsCreating(false);
     setPendingDeleteId(null);
   }
 
+  function handOffTask(task, newAssignee) {
+    if (task.assignee === newAssignee) {
+      return;
+    }
+
+    setTasks((currentTasks) =>
+      currentTasks.map((currentTask) =>
+        currentTask.id === task.id
+          ? { ...currentTask, assignee: newAssignee }
+          : currentTask,
+      ),
+    );
+
+    setHandoffMessage(
+      `"${task.title}" handed off to ${newAssignee}.`,
+    );
+  }
+
+  const activeTasks = tasks.filter((task) => task.status !== 'done');
+
   return (
-    <div className="min-h-screen bg-surface-page p-6 text-text-primary">
-      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-brand-primary">
-            Team workspace
-          </p>
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-xl font-bold text-white shadow-sm">
+              V
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                Vibecoding Project Tracker
+              </h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Keep your team, tasks, and progress in sync.
+              </p>
+            </div>
+          </div>
 
-          <h1 className="text-2xl font-bold">
-            Vibecoding Project Tracker
-          </h1>
-
-          <p className="mt-2 text-sm text-text-muted">
-            Keep your tasks, deadlines and coding context organised.
-          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedTask(null);
+              setIsCreating(true);
+            }}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          >
+            <span aria-hidden="true" className="text-lg leading-none">
+              +
+            </span>
+            Add Task
+          </button>
         </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedTask(null);
-            setIsCreating(true);
-          }}
-          className="rounded-lg bg-brand-primary px-4 py-2.5 font-semibold text-white shadow-sm hover:bg-teal-800"
-        >
-          + Add Task
-        </button>
       </header>
 
-      <main className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        {STAGES.map((stage) => {
-          const stageTasks = tasks.filter(
-            (task) => task.status === stage.id
-          );
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">
+              Project board
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {tasks.length} total {tasks.length === 1 ? 'task' : 'tasks'} ·{' '}
+              {activeTasks.length} active
+            </p>
+          </div>
+        </div>
 
-          return (
-            <section
-              key={stage.id}
-              className="min-w-0 rounded-xl border border-slate-200 bg-slate-100/70 p-3"
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-semibold">{stage.label}</h2>
+        <TeamOverview tasks={tasks} />
 
-                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-text-muted">
-                  {stageTasks.length}
-                </span>
-              </div>
+        <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-4">
+          {STAGES.map((stage) => {
+            const stageTasks = tasks.filter(
+              (task) => task.status === stage.id,
+            );
 
-              <div className="space-y-3">
-                {stageTasks.map((task) => {
-                  const typeStyle =
-                    TASK_TYPES[task.type] ?? TASK_TYPES.feature;
+            return (
+              <section
+                key={stage.id}
+                aria-labelledby={`stage-${stage.id}`}
+                className="min-w-0 rounded-2xl border border-slate-200 bg-slate-100/70 p-3"
+              >
+                <div className="mb-4 flex items-center justify-between px-1 pt-1">
+                  <h2
+                    id={`stage-${stage.id}`}
+                    className="font-bold text-slate-800"
+                  >
+                    {stage.title}
+                  </h2>
+                  <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-white px-2 text-xs font-bold text-slate-600 shadow-sm">
+                    {stageTasks.length}
+                  </span>
+                </div>
 
-                  return (
-                    <button
-                      type="button"
+                <div className="space-y-3">
+                  {stageTasks.map((task) => (
+                    <TaskCard
                       key={task.id}
-                      onClick={() => {
-                        setSelectedTask(task);
+                      task={task}
+                      onOpen={(selected) => {
+                        setSelectedTask(selected);
                         setIsCreating(false);
                       }}
-                      className={`block w-full rounded-lg border border-l-4 p-4 text-left shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-teal-600 ${typeStyle.card}`}
-                    >
-                      <div className="mb-3 flex items-center justify-between gap-2">
-                        <TaskTypeBadge type={task.type} />
+                      onHandOff={handOffTask}
+                    />
+                  ))}
 
-                        <span className="text-xs text-text-muted">
-                          {task.id}
-                        </span>
-                      </div>
-
-                      <h3 className={`font-semibold ${typeStyle.heading}`}>
-                        {task.title}
-                      </h3>
-
-                      <p className="mt-2 text-sm leading-5 text-text-muted">
-                        {task.description}
+                  {stageTasks.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-slate-300 px-3 py-8 text-center">
+                      <p className="text-sm text-slate-400">
+                        No tasks here yet
                       </p>
+                    </div>
+                  )}
+                </div>
 
-                      <div className="mt-4 border-t border-slate-200/70 pt-3">
-                        <p className="text-xs text-text-muted">
-                          Assigned to
-                        </p>
-
-                        <p className="mt-1 text-sm font-medium">
-                          {task.assignee}
-                        </p>
-
-                        {task.dueDate && (
-                          <p className="mt-2 text-xs text-text-muted">
-                            Due: {task.dueDate}
-                          </p>
-                        )}
-                      </div>
-
-                      <p className="mt-3 text-xs text-brand-primary">
-                        Click to view or edit
-                      </p>
-                    </button>
-                  );
-                })}
-
-                {stageTasks.length === 0 && (
-                  <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-text-muted">
-                    Nothing here yet — add a task to get started.
-                  </p>
-                )}
-              </div>
-            </section>
-          );
-        })}
-      </main>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedTask(null);
+                    setIsCreating(true);
+                  }}
+                  className="mt-3 w-full rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-500 transition hover:bg-white hover:text-indigo-700"
+                >
+                  + Add task
+                </button>
+              </section>
+            );
+          })}
+        </div>
+      </div>
 
       {(isCreating || selectedTask) && (
         <TaskModal
-          key={selectedTask?.id ?? 'new-task'}
+          key={selectedTask?.id || 'new-task'}
           task={selectedTask}
           onSave={saveTask}
-          onDelete={deleteTask}
           onClose={() => {
             setSelectedTask(null);
             setIsCreating(false);
           }}
+          onDelete={deleteTask}
         />
       )}
 
       {pendingDeleteId && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4">
-          <section
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="delete-dialog-title"
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
-          >
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100">
-                <span className="text-xl text-red-600">!</span>
-              </div>
-
-              <div>
-                <h2
-                  id="delete-dialog-title"
-                  className="text-lg font-bold text-slate-900"
-                >
-                  Delete task?
-                </h2>
-
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Are you sure you want to delete this task? This action
-                  cannot be undone.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setPendingDeleteId(null)}
-                className="rounded-lg border border-slate-300 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={confirmDelete}
-                className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700"
-              >
-                Delete task
-              </button>
-            </div>
-          </section>
-        </div>
+        <DeleteConfirmation
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDeleteId(null)}
+        />
       )}
-    </div>
+
+      <HandoffToast
+        message={handoffMessage}
+        onDismiss={() => setHandoffMessage('')}
+      />
+    </main>
   );
 }
