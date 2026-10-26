@@ -151,6 +151,110 @@ function TaskTypeBadge({ type }) {
   );
 }
 
+/*
+ * MILESTONE 8: Due-date colour coding.
+ *
+ * This uses the existing dueDate and status fields.
+ * No new task fields or changes to saved task data are needed.
+ *
+ * Deadline interpretation: the due date ends at 23:59:59.999
+ * in the user's local time zone.
+ */
+function getDueStyle(task, now = Date.now()) {
+  // Completed tasks must always look neutral, even when overdue.
+  if (task.status === 'done') {
+    return {
+      className: 'bg-slate-100 border-slate-200',
+      label: 'Completed',
+      labelClassName: 'bg-slate-200 text-slate-700',
+    };
+  }
+
+  // Tasks without a deadline retain a neutral appearance.
+  if (!task.dueDate) {
+    return {
+      className: 'bg-white border-slate-200',
+      label: '',
+      labelClassName: '',
+    };
+  }
+
+  // Validate the existing YYYY-MM-DD date before using it.
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(task.dueDate);
+
+  if (!match) {
+    return {
+      className: 'bg-white border-slate-200',
+      label: '',
+      labelClassName: '',
+    };
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  const deadline = new Date(
+    year,
+    month - 1,
+    day,
+    23,
+    59,
+    59,
+    999,
+  );
+
+  // Invalid calendar dates should not be shown as overdue.
+  if (
+    deadline.getFullYear() !== year ||
+    deadline.getMonth() !== month - 1 ||
+    deadline.getDate() !== day
+  ) {
+    return {
+      className: 'bg-white border-slate-200',
+      label: '',
+      labelClassName: '',
+    };
+  }
+
+  const hoursRemaining =
+    (deadline.getTime() - now) / (1000 * 60 * 60);
+
+  // The deadline has passed.
+  if (hoursRemaining < 0) {
+    return {
+      className: 'bg-red-50 border-red-300',
+      label: 'Overdue',
+      labelClassName: 'bg-red-100 text-red-800',
+    };
+  }
+
+  // Less than 24 hours remain.
+  if (hoursRemaining < 24) {
+    return {
+      className: 'bg-amber-50 border-amber-300',
+      label: 'Due soon',
+      labelClassName: 'bg-amber-100 text-amber-800',
+    };
+  }
+
+  // Between 24 and 48 hours remain.
+  if (hoursRemaining <= 48) {
+    return {
+      className: 'bg-sky-50 border-sky-300',
+      label: 'Due shortly',
+      labelClassName: 'bg-sky-100 text-sky-800',
+    };
+  }
+
+  // More than 48 hours remain.
+  return {
+    className: 'bg-emerald-50 border-emerald-200',
+    label: '',
+    labelClassName: '',
+  };
+}
+
 function TaskModal({ task, onSave, onClose, onDelete }) {
   const isEditing = Boolean(task);
 
@@ -480,12 +584,15 @@ function TeamOverview({ tasks }) {
   );
 }
 
-function TaskCard({ task, onOpen, onHandOff }) {
+function TaskCard({ task, onOpen, onHandOff, now }) {
   const typeStyle = TASK_TYPES[task.type] || TASK_TYPES.feature;
+
+  // MILESTONE 8: Calculate deadline styling using the existing task data.
+  const dueStyle = getDueStyle(task, now);
 
   return (
     <article
-      className={`rounded-xl border border-slate-200 border-l-4 ${typeStyle.card} bg-white p-4 shadow-sm transition hover:shadow-md`}
+      className={`rounded-xl border border-slate-200 border-l-4 ${typeStyle.card} ${dueStyle.className} p-4 shadow-sm transition-colors duration-300 hover:shadow-md`}
     >
       <button
         type="button"
@@ -493,7 +600,7 @@ function TaskCard({ task, onOpen, onHandOff }) {
         className="block w-full rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
         aria-label={`Edit task: ${task.title}`}
       >
-        <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
           <TaskTypeBadge type={task.type} />
           <span className="text-xs text-slate-400">
             {task.id.replace('task-', '#')}
@@ -511,7 +618,7 @@ function TaskCard({ task, onOpen, onHandOff }) {
         )}
       </button>
 
-      <div className="mt-4 border-t border-slate-100 pt-3">
+      <div className="mt-4 border-t border-slate-200/70 pt-3">
         <div className="flex items-center gap-2">
           <TaskAvatar name={task.assignee} />
           <div className="min-w-0 flex-1">
@@ -523,19 +630,50 @@ function TaskCard({ task, onOpen, onHandOff }) {
         </div>
 
         {task.dueDate && (
-          <p className="mt-3 text-xs text-slate-500">
-            <span aria-hidden="true">📅 </span>
-            Due{' '}
-            {new Date(`${task.dueDate}T00:00:00`).toLocaleDateString(
-              'en-GB',
-              {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              },
-            )}
-          </p>
-        )}
+  <div className="mt-4 flex flex-wrap items-center gap-2">
+    <div
+      className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 ${
+        task.status === 'done'
+          ? 'border-slate-300 bg-slate-100 text-slate-600'
+          : dueStyle.label === 'Overdue'
+            ? 'border-red-300 bg-red-100 text-red-900'
+            : dueStyle.label === 'Due soon'
+              ? 'border-amber-300 bg-amber-100 text-amber-900'
+              : dueStyle.label === 'Due shortly'
+                ? 'border-sky-300 bg-sky-100 text-sky-900'
+                : 'border-emerald-300 bg-emerald-100 text-emerald-900'
+      }`}
+    >
+      <span aria-hidden="true" className="text-base">
+        📅
+      </span>
+
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-wider opacity-75">
+          Due date
+        </p>
+        <p className="text-sm font-bold">
+          {new Date(`${task.dueDate}T00:00:00`).toLocaleDateString(
+            'en-GB',
+            {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            },
+          )}
+        </p>
+      </div>
+    </div>
+
+    {dueStyle.label && (
+      <span
+        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${dueStyle.labelClassName}`}
+      >
+        {dueStyle.label}
+      </span>
+    )}
+  </div>
+)}
 
         <div className="mt-3">
           <label
@@ -548,7 +686,7 @@ function TaskCard({ task, onOpen, onHandOff }) {
             id={`handoff-${task.id}`}
             value={task.assignee}
             onChange={(event) => onHandOff(task, event.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
           >
             {TEAM.map((member) => (
               <option key={member} value={member}>
@@ -561,7 +699,7 @@ function TaskCard({ task, onOpen, onHandOff }) {
         <button
           type="button"
           onClick={() => onOpen(task)}
-          className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+          className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-white hover:text-indigo-700"
         >
           View or edit task
         </button>
@@ -578,6 +716,7 @@ function HandoffToast({ message, onDismiss }) {
   return (
     <div
       role="status"
+      aria-live="polite"
       className="fixed bottom-5 right-5 z-[70] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white p-4 shadow-xl"
     >
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
@@ -610,6 +749,10 @@ export default function App() {
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [handoffMessage, setHandoffMessage] = useState('');
 
+  // MILESTONE 8: Keep the current time in state so deadline colours
+  // refresh automatically, without the user needing to refresh the page.
+  const [now, setNow] = useState(() => Date.now());
+
   useEffect(() => {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
@@ -617,6 +760,14 @@ export default function App() {
       console.error('Unable to save tasks to local storage:', error);
     }
   }, [tasks]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 60_000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     if (!handoffMessage) {
@@ -731,6 +882,36 @@ export default function App() {
 
         <TeamOverview tasks={tasks} />
 
+        {/* MILESTONE 8: Deadline colour legend */}
+        <div
+          aria-label="Task deadline colour legend"
+          className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600"
+        >
+          <span className="font-semibold text-slate-800">
+            Deadline colours:
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-emerald-300 bg-emerald-50" />
+            More than 48 hours
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-sky-300 bg-sky-50" />
+            24–48 hours
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-amber-300 bg-amber-50" />
+            Under 24 hours
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-red-300 bg-red-50" />
+            Overdue
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-slate-300 bg-slate-100" />
+            Done / no due date
+          </span>
+        </div>
+
         <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-4">
           {STAGES.map((stage) => {
             const stageTasks = tasks.filter(
@@ -760,6 +941,7 @@ export default function App() {
                     <TaskCard
                       key={task.id}
                       task={task}
+                      now={now}
                       onOpen={(selected) => {
                         setSelectedTask(selected);
                         setIsCreating(false);
