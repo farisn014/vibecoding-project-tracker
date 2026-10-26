@@ -14,6 +14,38 @@ export const TEAM = [
   'Teammate C',
 ];
 
+const TASK_TYPES = {
+  feature: {
+    label: 'Feature',
+    icon: '✦',
+    badge: 'bg-blue-100 text-blue-800 ring-1 ring-blue-200',
+    card: 'border-blue-200 border-l-blue-600 bg-blue-50/50 hover:border-blue-400',
+    preview: 'border-blue-200 bg-blue-50',
+    heading: 'text-blue-900',
+  },
+  bug: {
+    label: 'Bug',
+    icon: '🐛',
+    badge: 'bg-red-100 text-red-800 ring-1 ring-red-200',
+    card: 'border-red-200 border-l-red-600 bg-red-50/50 hover:border-red-400',
+    preview: 'border-red-200 bg-red-50',
+    heading: 'text-red-900',
+  },
+};
+
+function TaskTypeBadge({ type }) {
+  const style = TASK_TYPES[type] ?? TASK_TYPES.feature;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold ${style.badge}`}
+    >
+      <span aria-hidden="true">{style.icon}</span>
+      {style.label}
+    </span>
+  );
+}
+
 const INITIAL_TASKS = [
   {
     id: 'task-001',
@@ -77,6 +109,7 @@ function TaskModal({ task, onSave, onDelete, onClose }) {
   }));
 
   const [error, setError] = useState('');
+  const typeStyle = TASK_TYPES[form.type] ?? TASK_TYPES.feature;
 
   function updateField(event) {
     const { name, value } = event.target;
@@ -160,6 +193,17 @@ function TaskModal({ task, onSave, onDelete, onClose }) {
               className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-700"
               placeholder="Describe the task"
             />
+          </div>
+
+          <div className={`rounded-lg border p-3 ${typeStyle.preview}`}>
+            <div className="flex flex-wrap items-center gap-2">
+              <TaskTypeBadge type={form.type} />
+              <span className={`text-sm font-medium ${typeStyle.heading}`}>
+                {form.type === 'bug'
+                  ? 'An issue that needs fixing'
+                  : 'New functionality or improvement'}
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -388,59 +432,58 @@ export default function App() {
               </div>
 
               <div className="space-y-3">
-                {stageTasks.map((task) => (
-                  <button
-                    type="button"
-                    key={task.id}
-                    onClick={() => {
-                      setSelectedTask(task);
-                      setIsCreating(false);
-                    }}
-                    className="block w-full rounded-lg border border-slate-200 bg-surface-card p-4 text-left shadow-sm transition hover:border-teal-500 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-teal-600"
-                  >
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <span
-                        className={`rounded-md px-2 py-1 text-xs font-semibold ${
-                          task.type === 'bug'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}
-                      >
-                        {task.type === 'bug' ? 'Bug' : 'Feature'}
-                      </span>
+                {stageTasks.map((task) => {
+                  const typeStyle =
+                    TASK_TYPES[task.type] ?? TASK_TYPES.feature;
 
-                      <span className="text-xs text-text-muted">
-                        {task.id}
-                      </span>
-                    </div>
+                  return (
+                    <button
+                      type="button"
+                      key={task.id}
+                      onClick={() => {
+                        setSelectedTask(task);
+                        setIsCreating(false);
+                      }}
+                      className={`block w-full rounded-lg border border-l-4 p-4 text-left shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-teal-600 ${typeStyle.card}`}
+                    >
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <TaskTypeBadge type={task.type} />
 
-                    <h3 className="font-semibold">{task.title}</h3>
+                        <span className="text-xs text-text-muted">
+                          {task.id}
+                        </span>
+                      </div>
 
-                    <p className="mt-2 text-sm leading-5 text-text-muted">
-                      {task.description}
-                    </p>
+                      <h3 className={`font-semibold ${typeStyle.heading}`}>
+                        {task.title}
+                      </h3>
 
-                    <div className="mt-4 border-t border-slate-100 pt-3">
-                      <p className="text-xs text-text-muted">
-                        Assigned to
+                      <p className="mt-2 text-sm leading-5 text-text-muted">
+                        {task.description}
                       </p>
 
-                      <p className="mt-1 text-sm font-medium">
-                        {task.assignee}
-                      </p>
-
-                      {task.dueDate && (
-                        <p className="mt-2 text-xs text-text-muted">
-                          Due: {task.dueDate}
+                      <div className="mt-4 border-t border-slate-200/70 pt-3">
+                        <p className="text-xs text-text-muted">
+                          Assigned to
                         </p>
-                      )}
-                    </div>
 
-                    <p className="mt-3 text-xs text-brand-primary">
-                      Click to view or edit
-                    </p>
-                  </button>
-                ))}
+                        <p className="mt-1 text-sm font-medium">
+                          {task.assignee}
+                        </p>
+
+                        {task.dueDate && (
+                          <p className="mt-2 text-xs text-text-muted">
+                            Due: {task.dueDate}
+                          </p>
+                        )}
+                      </div>
+
+                      <p className="mt-3 text-xs text-brand-primary">
+                        Click to view or edit
+                      </p>
+                    </button>
+                  );
+                })}
 
                 {stageTasks.length === 0 && (
                   <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-text-muted">
