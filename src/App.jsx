@@ -315,7 +315,60 @@ function getRelativeTime(timestamp, now = Date.now()) {
   return `${years} ${years === 1 ? 'year' : 'years'} ago`;
 }
 
-function TaskModal({ task, onSave, onClose, onDelete, now }) {
+// MILESTONE 10: Format task details and AI context as Markdown.
+function formatTaskContext(task) {
+  return [
+    `# ${task.title?.trim() || 'Untitled task'}`,
+    '',
+    '## Description',
+    task.description?.trim() || 'No description provided.',
+    '',
+    '## AI Task Context',
+    task.context?.trim() || 'No additional context provided.',
+  ].join('\n');
+}
+
+// MILESTONE 10: Copy the formatted task briefing to the clipboard.
+async function copyTaskContext(task) {
+  const markdown = formatTaskContext(task);
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(markdown);
+      return true;
+    }
+
+    // Fallback for browsers without the Clipboard API.
+    const textArea = document.createElement('textarea');
+    textArea.value = markdown;
+    textArea.setAttribute('readonly', '');
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    textArea.select();
+
+    const copied = document.execCommand('copy');
+    document.body.removeChild(textArea);
+
+    if (!copied) {
+      throw new Error('The browser could not copy the text.');
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Unable to copy task context:', error);
+    return false;
+  }
+}
+
+function TaskModal({
+  task,
+  onSave,
+  onClose,
+  onDelete,
+  onCopyContext,
+  now,
+}) {
   const isEditing = Boolean(task);
 
   const [title, setTitle] = useState(task?.title || '');
@@ -365,6 +418,17 @@ function TaskModal({ task, onSave, onClose, onDelete, now }) {
       contextUpdatedAt,
       createdDate:
         task?.createdDate || new Date().toISOString().slice(0, 10),
+    });
+  }
+
+  // MILESTONE 10: Copy the current form values, including unsaved edits.
+  function handleCopyCurrentContext() {
+    onCopyContext({
+      ...(task || {}),
+      title,
+      description,
+      context,
+      contextTool,
     });
   }
 
@@ -523,6 +587,15 @@ function TaskModal({ task, onSave, onClose, onDelete, now }) {
                 ))}
               </select>
             </div>
+
+            {/* MILESTONE 10: Copy Context inside the task modal */}
+            <button
+              type="button"
+              onClick={handleCopyCurrentContext}
+              className="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            >
+              Copy Context
+            </button>
           </section>
 
           <div>
@@ -740,7 +813,7 @@ function TeamOverview({ tasks }) {
   );
 }
 
-function TaskCard({ task, onOpen, onHandOff, now }) {
+function TaskCard({ task, onOpen, onHandOff, onCopyContext, now }) {
   const typeStyle = TASK_TYPES[task.type] || TASK_TYPES.feature;
   const dueStyle = getDueStyle(task, now);
 
@@ -857,6 +930,15 @@ function TaskCard({ task, onOpen, onHandOff, now }) {
         >
           View or edit task
         </button>
+
+        {/* MILESTONE 10: Copy Context button on every task card */}
+        <button
+          type="button"
+          onClick={() => onCopyContext(task)}
+          className="mt-2 w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        >
+          Copy Context
+        </button>
       </div>
     </article>
   );
@@ -896,12 +978,57 @@ function HandoffToast({ message, onDismiss }) {
   );
 }
 
+// MILESTONE 10: Separate feedback for clipboard actions.
+function CopyToast({ message, onDismiss }) {
+  if (!message) {
+    return null;
+  }
+
+  const failed = message.startsWith('Copy failed');
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`fixed bottom-5 left-5 z-[70] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-xl border p-4 shadow-xl ${
+        failed
+          ? 'border-red-200 bg-white'
+          : 'border-indigo-200 bg-white'
+      }`}
+    >
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-bold ${
+          failed
+            ? 'bg-red-100 text-red-700'
+            : 'bg-indigo-100 text-indigo-700'
+        }`}
+      >
+        {failed ? '!' : '✓'}
+      </span>
+
+      <p className="min-w-0 flex-1 break-words text-sm font-medium text-slate-800">
+        {message}
+      </p>
+
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss copy notification"
+        className="rounded-lg px-2 text-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const [tasks, setTasks] = useState(loadTasks);
   const [selectedTask, setSelectedTask] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [handoffMessage, setHandoffMessage] = useState('');
+  const [copyMessage, setCopyMessage] = useState('');
 
   // MILESTONE 8: Update deadline colours and context timestamps automatically.
   const [now, setNow] = useState(() => Date.now());
@@ -933,6 +1060,19 @@ export default function App() {
 
     return () => window.clearTimeout(timeoutId);
   }, [handoffMessage]);
+
+  // MILESTONE 10: Automatically dismiss clipboard feedback.
+  useEffect(() => {
+    if (!copyMessage) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setCopyMessage('');
+    }, 4000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [copyMessage]);
 
   function saveTask(taskToSave) {
     setTasks((currentTasks) => {
@@ -981,6 +1121,17 @@ export default function App() {
 
     setHandoffMessage(
       `"${task.title}" handed off to ${newAssignee}.`,
+    );
+  }
+
+  // MILESTONE 10: Copy the selected task's Markdown briefing.
+  async function handleCopyContext(task) {
+    const success = await copyTaskContext(task);
+
+    setCopyMessage(
+      success
+        ? 'Context copied! Paste it into your AI coding tool.'
+        : 'Copy failed. Check your browser clipboard permissions and try again.',
     );
   }
 
@@ -1100,6 +1251,7 @@ export default function App() {
                         setIsCreating(false);
                       }}
                       onHandOff={handOffTask}
+                      onCopyContext={handleCopyContext}
                     />
                   ))}
 
@@ -1139,6 +1291,7 @@ export default function App() {
             setIsCreating(false);
           }}
           onDelete={deleteTask}
+          onCopyContext={handleCopyContext}
         />
       )}
 
@@ -1152,6 +1305,12 @@ export default function App() {
       <HandoffToast
         message={handoffMessage}
         onDismiss={() => setHandoffMessage('')}
+      />
+
+      {/* MILESTONE 10: Clipboard success/failure notification */}
+      <CopyToast
+        message={copyMessage}
+        onDismiss={() => setCopyMessage('')}
       />
     </main>
   );
