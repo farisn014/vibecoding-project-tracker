@@ -41,12 +41,15 @@ FR4 - The system should enable users to change the task state and assign tasks t
 
 FR5 - The system should allow users to save prompt context for each task and copy it with the task details, for use in AI tools.
 
-FR6 - The system should allow users to create new tasks by entering the required task information.
+FR6 - The system should automatically save task and deliverable information so that it can be retrieved when the application is reopened.
 
-FR7 - The system should automatically save task and deliverable information so that it can be retrieved when the application is reopened.
+FR7 - The system should should users to change a task's status and move it between the four Kanban columns.
 
-FR8 - The system shall allow users to change a task's status and move it between the four Kanban columns.
+FR8  — The system should allow users to select a tasky type of feature or bug.
 
+FR9 — The system should allow users to select an AI tool to associate with each task's saved prompt context.
+
+FR10 — The system should allow users to add and save URLs for the four project deliverables: Presentation, Demo, Report and Documentation.
 
 Non-functional Requirements 
 
@@ -62,8 +65,9 @@ NFR5 - The application should operate in modern desktop web browsers that suppor
 
 NFR6 - The changes to a task shall be reflected in the appropriate Kanban column and remain consistent with the saved data.
 
-NFR8 - The interface should use sufficiently clear text, labels and visual distinctions to separate users identify task types and statuses.
+NFR7 - The interface should use sufficiently clear text, labels and visual distinctions to separate users identify task types and statuses.
 
+NFR8 - The application should provide clear feedback to users when they perform actions such as copying prompt context, saving or deleting tasks.
 
 Data Requirements:
 
@@ -82,6 +86,10 @@ DR6 - The system should store the type of each task as either feature or bug.
 DR7 - When a task is edited, the system should update the existing stored record rather than create a duplicate task.
 
 DR8 - The system should store the URLs associated with the Presentation, Demo, Report and Documentation deliverables, allowing them to remain empty until available.
+
+DR9 – Each task's stored status should be updated when it is moved between Kanban columns, including through drag-and-drop.
+
+DR10 – The system should calculate the task completion indicator using the number of tasks with a Done status and the total number of tasks.
 
 ## 4. Primary user flow
 
