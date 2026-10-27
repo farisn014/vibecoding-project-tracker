@@ -968,13 +968,34 @@ function TeamOverview({ tasks }) {
   );
 }
 
-function TaskCard({ task, onOpen, onHandOff, onCopyContext, now }) {
+// MILESTONE 12: Task cards can be dragged between Kanban columns.
+function TaskCard({
+  task,
+  onOpen,
+  onHandOff,
+  onCopyContext,
+  now,
+  onDragStart,
+  onDragEnd,
+  isDragging,
+}) {
   const typeStyle = TASK_TYPES[task.type] || TASK_TYPES.feature;
   const dueStyle = getDueStyle(task, now);
 
   return (
     <article
-      className={`rounded-xl border border-slate-200 border-l-4 ${typeStyle.card} ${dueStyle.className} p-4 shadow-sm transition-colors duration-300 hover:shadow-md`}
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', task.id);
+        onDragStart(task.id);
+      }}
+      onDragEnd={onDragEnd}
+      className={`rounded-xl border border-slate-200 border-l-4 ${typeStyle.card} ${dueStyle.className} p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
+        isDragging
+          ? 'scale-[0.98] opacity-40'
+          : 'cursor-grab active:cursor-grabbing'
+      }`}
     >
       <button
         type="button"
@@ -1188,6 +1209,10 @@ export default function App() {
   // MILESTONE 11: Load deliverable links from their own localStorage key.
   const [deliverables, setDeliverables] = useState(loadDeliverables);
 
+  // MILESTONE 12: Track dragged cards and highlighted drop targets.
+  const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const [dragOverStage, setDragOverStage] = useState(null);
+
   // MILESTONE 8: Update deadline colours and context timestamps automatically.
   const [now, setNow] = useState(() => Date.now());
 
@@ -1305,6 +1330,24 @@ export default function App() {
     );
   }
 
+  // MILESTONE 12: Move a task between Kanban columns.
+  function moveTaskToStage(taskId, newStatus) {
+    if (!STAGES.some((stage) => stage.id === newStatus)) {
+      return;
+    }
+
+    setTasks((currentTasks) =>
+      currentTasks.map((task) =>
+        task.id === taskId
+          ? { ...task, status: newStatus }
+          : task,
+      ),
+    );
+
+    setDraggedTaskId(null);
+    setDragOverStage(null);
+  }
+
   // MILESTONE 10: Copy the selected task's Markdown briefing.
   async function handleCopyContext(task) {
     const success = await copyTaskContext(task);
@@ -1317,6 +1360,16 @@ export default function App() {
   }
 
   const activeTasks = tasks.filter((task) => task.status !== 'done');
+
+  // MILESTONE 12: Calculate completion directly from the saved task states.
+  const completedTasks = tasks.filter(
+    (task) => task.status === 'done',
+  ).length;
+
+  const completionPercentage =
+    tasks.length === 0
+      ? 0
+      : Math.round((completedTasks / tasks.length) * 100);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -1360,14 +1413,46 @@ export default function App() {
         />
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
+          <div className="w-full">
             <h2 className="text-2xl font-bold text-slate-900">
               Project board
             </h2>
+
             <p className="mt-1 text-sm text-slate-500">
               {tasks.length} total {tasks.length === 1 ? 'task' : 'tasks'} ·{' '}
               {activeTasks.length} active
             </p>
+
+            {/* MILESTONE 12: Live project completion indicator. */}
+            <div className="mt-4 max-w-xl rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="font-semibold text-slate-700">
+                  Project completion
+                </span>
+
+                <span
+                  className="font-bold text-indigo-700"
+                  aria-live="polite"
+                >
+                  {completedTasks} of {tasks.length} completed (
+                  {completionPercentage}%)
+                </span>
+              </div>
+
+              <div
+                className="h-3 overflow-hidden rounded-full bg-slate-200"
+                role="progressbar"
+                aria-label="Project completion"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={completionPercentage}
+              >
+                <div
+                  className="h-full rounded-full bg-indigo-600 transition-all duration-300"
+                  style={{ width: `${completionPercentage}%` }}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1413,7 +1498,40 @@ export default function App() {
               <section
                 key={stage.id}
                 aria-labelledby={`stage-${stage.id}`}
-                className="min-w-0 rounded-2xl border border-slate-200 bg-slate-100/70 p-3"
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'move';
+
+                  if (dragOverStage !== stage.id) {
+                    setDragOverStage(stage.id);
+                  }
+                }}
+                onDragLeave={(event) => {
+                  if (
+                    !event.currentTarget.contains(event.relatedTarget)
+                  ) {
+                    setDragOverStage((current) =>
+                      current === stage.id ? null : current,
+                    );
+                  }
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+
+                  const taskId =
+                    event.dataTransfer.getData('text/plain');
+
+                  if (taskId) {
+                    moveTaskToStage(taskId, stage.id);
+                  } else {
+                    setDragOverStage(null);
+                  }
+                }}
+                className={`min-w-0 rounded-2xl border p-3 transition-colors duration-200 ${
+                  dragOverStage === stage.id
+                    ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-200'
+                    : 'border-slate-200 bg-slate-100/70'
+                }`}
               >
                 <div className="mb-4 flex items-center justify-between px-1 pt-1">
                   <h2
@@ -1439,13 +1557,21 @@ export default function App() {
                       }}
                       onHandOff={handOffTask}
                       onCopyContext={handleCopyContext}
+                      onDragStart={setDraggedTaskId}
+                      onDragEnd={() => {
+                        setDraggedTaskId(null);
+                        setDragOverStage(null);
+                      }}
+                      isDragging={draggedTaskId === task.id}
                     />
                   ))}
 
                   {stageTasks.length === 0 && (
                     <div className="rounded-xl border border-dashed border-slate-300 px-3 py-8 text-center">
                       <p className="text-sm text-slate-400">
-                        No tasks here yet
+                        {draggedTaskId
+                          ? 'Drop task here'
+                          : 'No tasks here yet'}
                       </p>
                     </div>
                   )}
