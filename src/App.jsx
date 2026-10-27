@@ -12,9 +12,19 @@ import DeleteConfirmation from './components/DeleteConfirmation';
 import TeamOverview from './components/TeamOverview';
 import TaskColumn from './components/TaskColumn';
 import { HandoffToast, CopyToast } from './components/Toast';
+import SettingsPanel from './components/SettingsPanel';
 
 const STORAGE_KEY = 'vibetracker.tasks';
 const DELIVERABLES_STORAGE_KEY = 'vibetracker.deliverables';
+
+function loadPreference(key, allowedValues, fallback) {
+  try {
+    const saved = localStorage.getItem(key);
+    return allowedValues.includes(saved) ? saved : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export default function App() {
   const [tasks, setTasks] = useState(loadTasks);
@@ -22,6 +32,7 @@ export default function App() {
 
   const [selectedTask, setSelectedTask] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [newTaskStatus, setNewTaskStatus] = useState('todo');
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   const [handoffMessage, setHandoffMessage] = useState('');
@@ -31,6 +42,24 @@ export default function App() {
   const [dragOverStage, setDragOverStage] = useState(null);
 
   const [now, setNow] = useState(() => Date.now());
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const [theme, setTheme] = useState(() =>
+    loadPreference(
+      'vibetracker.theme',
+      ['light', 'dark'],
+      'light',
+    ),
+  );
+
+  const [textSize, setTextSize] = useState(() =>
+    loadPreference(
+      'vibetracker.textSize',
+      ['default', 'large', 'extra-large'],
+      'default',
+    ),
+  );
 
   // Save tasks independently from deliverables.
   useEffect(() => {
@@ -52,13 +81,41 @@ export default function App() {
     }
   }, [deliverables]);
 
-  // Refresh deadline colours and labels every minute.
+  useEffect(() => {
+    document.documentElement.classList.toggle(
+      'app-dark',
+      theme === 'dark',
+    );
+
+    try {
+      localStorage.setItem('vibetracker.theme', theme);
+    } catch (error) {
+      console.error('Unable to save theme preference:', error);
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    const fontSizes = {
+      default: '16px',
+      large: '18px',
+      'extra-large': '20px',
+    };
+
+    document.documentElement.style.fontSize =
+      fontSizes[textSize] || fontSizes.default;
+
+    try {
+      localStorage.setItem('vibetracker.textSize', textSize);
+    } catch (error) {
+      console.error('Unable to save text size preference:', error);
+    }
+  }, [textSize]);
+
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(interval);
   }, []);
 
-  // Automatically dismiss notifications.
   useEffect(() => {
     if (!handoffMessage) return undefined;
 
@@ -82,12 +139,9 @@ export default function App() {
 
   function openNewTask(stageId = 'todo') {
     setSelectedTask(null);
-    setIsCreating(true);
     setNewTaskStatus(stageId);
+    setIsCreating(true);
   }
-
-  // Keep the requested starting column for newly created tasks.
-  const [newTaskStatus, setNewTaskStatus] = useState('todo');
 
   function closeTaskModal() {
     setSelectedTask(null);
@@ -101,23 +155,26 @@ export default function App() {
   }
 
   function saveTask(taskToSave) {
-    const taskWithStatus =
+    const taskToStore =
       !selectedTask && isCreating
-        ? { ...taskToSave, status: taskToSave.status || newTaskStatus }
+        ? {
+            ...taskToSave,
+            status: taskToSave.status || newTaskStatus,
+          }
         : taskToSave;
 
     setTasks((currentTasks) => {
       const existing = currentTasks.some(
-        (task) => task.id === taskWithStatus.id,
+        (task) => task.id === taskToStore.id,
       );
 
       if (existing) {
         return currentTasks.map((task) =>
-          task.id === taskWithStatus.id ? taskWithStatus : task,
+          task.id === taskToStore.id ? taskToStore : task,
         );
       }
 
-      return [...currentTasks, taskWithStatus];
+      return [...currentTasks, taskToStore];
     });
 
     closeTaskModal();
@@ -207,13 +264,40 @@ export default function App() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => openNewTask('todo')}
-            className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
-          >
-            + Add task
-          </button>
+          <div className="relative flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSettingsOpen((open) => !open)}
+              aria-expanded={settingsOpen}
+              aria-controls="accessibility-settings"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              ⚙ Settings
+            </button>
+
+            <button
+              type="button"
+              onClick={() => openNewTask('todo')}
+              className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            >
+              + Add task
+            </button>
+
+            {settingsOpen && (
+              <div
+                id="accessibility-settings"
+                className="absolute right-0 top-full z-50 mt-3"
+              >
+                <SettingsPanel
+                  theme={theme}
+                  setTheme={setTheme}
+                  textSize={textSize}
+                  setTextSize={setTextSize}
+                  onClose={() => setSettingsOpen(false)}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -339,17 +423,13 @@ export default function App() {
       {(isCreating || selectedTask) && (
         <TaskModal
           key={selectedTask?.id || 'new-task'}
-          task={
-            selectedTask ||
-            {
-              status: newTaskStatus,
-            }
-          }
+          task={selectedTask}
           onSave={saveTask}
           onClose={closeTaskModal}
           onDelete={deleteTask}
           onCopyContext={handleCopyContext}
           now={now}
+          initialStatus={newTaskStatus}
         />
       )}
 

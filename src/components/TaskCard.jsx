@@ -56,12 +56,12 @@ export default function TaskCard({
           </span>
         </div>
 
-        <h3 className="break-words font-semibold text-slate-900">
+        <h3 className="dark-card-text break-words font-semibold text-slate-900">
           {task.title}
         </h3>
 
         {task.description && (
-          <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words text-sm leading-5 text-slate-600">
+          <p className="dark-card-description mt-2 line-clamp-3 whitespace-pre-wrap break-words text-sm leading-5 text-slate-600">
             {task.description}
           </p>
         )}

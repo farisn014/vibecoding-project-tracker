@@ -51,6 +51,12 @@ FR9 — The system should allow users to select an AI tool to associate with eac
 
 FR10 — The system should allow users to add and save URLs for the four project deliverables: Presentation, Demo, Report and Documentation.
 
+FR11 – The system should allow users to switch between light mode and dark mode through the accessibility settings.
+
+FR12 – The system should allow users to change the text size to default, large or extra large to improve readability.
+
+FR13 – The system should allow users to reset their accessibility settings to the default options.
+
 Non-functional Requirements 
 
 NFR1 - The interface should be clear and easy for other members to navigate without complications.
@@ -68,6 +74,12 @@ NFR6 - The changes to a task shall be reflected in the appropriate Kanban column
 NFR7 - The interface should use sufficiently clear text, labels and visual distinctions to separate users identify task types and statuses.
 
 NFR8 - The application should provide clear feedback to users when they perform actions such as copying prompt context, saving or deleting tasks.
+
+NFR9 – The interface should maintain readable text and sufficient contrast between text and background colours in both light and dark modes.
+
+NFR10 – Accessibility settings should give clear visual feedback for selected and hovered options so users can identify their current selection and read the option labels.
+
+NFR11 – The interface should remain usable when users increase the text size, with text and controls remaining accessible and understandable.
 
 Data Requirements:
 
@@ -90,6 +102,12 @@ DR8 - The system should store the URLs associated with the Presentation, Demo, R
 DR9 – Each task's stored status should be updated when it is moved between Kanban columns, including through drag-and-drop.
 
 DR10 – The system should calculate the task completion indicator using the number of tasks with a Done status and the total number of tasks.
+
+DR11 – When users reset their accessibility settings, the appearance mode should return to light mode and the text size should return to Default.
+
+DR12 – The system should maintain the selected appearance mode and text-size setting while the application is in use.
+
+DR13 – The system should apply the selected text size consistently to the relevant interface elements.
 
 ## 4. Primary user flow
 
